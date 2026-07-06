@@ -1,8 +1,12 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-from schemas.user_schema import UserCreate
 from database import engine, Base, SessionLocal
+
+from schemas.user_schema import UserCreate
+from schemas.workout_schema import WorkoutCreate
+
 from models.user_model import User
+from models.workout_model import WorkoutSchedule
 
 # Automatically create tables in the database if they don't exist yet
 Base.metadata.create_all(bind=engine)
@@ -71,4 +75,33 @@ def get_user_profile(user_id: int, db: Session = Depends(get_db)):
         "calculated_tdee": tdee,
         "activity_level": "Moderate (Exercise 3-5 times/week)"
         }
+    }
+
+@app.post ("/workouts")
+def create_workout_schedule(workout: WorkoutCreate, db: Session = Depends(get_db)):
+
+    # 1. Foreign Key Protection: Verify if the user actually exists first
+    user_exist = db.query(User).filter(User.id == workout.user_id).first()
+
+    if not user_exist:
+        raise HTTPException(
+            status_code=404,
+            detail="User ID not found. Cannot asign workout"
+        )
+    
+    # 2. Map the validated incoming data to our SQLAlchemy model
+    new_workout = WorkoutSchedule(
+        user_id = workout.user_id,
+        day_name = workout.day_name,
+        split_type = workout.split_type
+    )
+
+    # 3. Save to database, commit the transaction, and fetch the generated ID
+    db.add(new_workout)
+    db.commit()
+    db.refresh(new_workout)
+
+    return{
+        "message": "Workout schedule added succesfully!",
+        "workout_data": new_workout
     }
