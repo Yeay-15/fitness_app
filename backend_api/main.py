@@ -74,7 +74,14 @@ def get_user_profile(user_id: int, db: Session = Depends(get_db)):
         "calculated_bmr": bmr,
         "calculated_tdee": tdee,
         "activity_level": "Moderate (Exercise 3-5 times/week)"
-        }
+        },
+        "workout_schedules": [
+            {
+                "schedule_id": workout.id,
+                "day_name": workout.day_name,
+                "split_type": workout.split_type
+            } for workout in user.workouts
+        ]
     }
 
 @app.post ("/workouts")
