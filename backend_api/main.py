@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import engine, Base, SessionLocal
 
-from schemas.user_schema import UserCreate
+from schemas.user_schema import UserCreate, UserUpdate
 from schemas.workout_schema import WorkoutCreate
 
 from models.user_model import User
@@ -82,6 +82,50 @@ def get_user_profile(user_id: int, db: Session = Depends(get_db)):
                 "split_type": workout.split_type
             } for workout in user.workouts
         ]
+    }
+
+# Endpoint to update user data (PUT)
+@app.put("/users/{user_id}")
+def update_user_profile(user_id: int, user_data: UserUpdate, db: Session = Depends(get_db)):
+    
+    # 1. Search for the user in the database
+    user = db.query(User).filter(User.id == user_id).first()
+
+    # 2. If user doesn't exist, throw a 404 error
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # 3. Dynamic Update: Loop through the incoming data and only update fields that are provided
+    update_data = user_data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(user, key, value)
+
+    # 4. Save changes permanently to PostgreSQL
+    db.commit()
+    db.refresh(user)
+
+    return{
+        "message": "User profile updated succesfully!",
+        "updated_data": user
+    }
+
+# Endpoint to delete a user and their data (DELETE)
+@app.delete("/users/{user_id}")
+def delete_user_account(user_id: int, db: Session = Depends(get_db)):
+
+    # 1. Search for the target user
+    user = db.query(User).filter(User.id == user_id).first()
+
+    # 2. Protect the endpoint from ghost IDs
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # 3. Delete from the database basket and commit permanently
+    db.delete(user)
+    db.commit()
+
+    return{
+        "message": f"User with ID {user_id} and all their have been deleted permanently"
     }
 
 @app.post ("/workouts")
